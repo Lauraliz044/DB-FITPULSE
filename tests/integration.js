@@ -12,6 +12,8 @@ const values = { admin: 'admin', client: 'client', active: 'active' };
 const { checkSchema } = require('../src/config/schema');
 const { pool, query } = require('../src/config/database');
 const { businessDate, utcDate } = require('../src/utils/time');
+const { hashPassword, verifyPassword, isPasswordHash } = require('../src/utils/passwords');
+const { migratePasswords } = require('../src/services/password-migration-service');
 
 const evidence = [];
 const runId = Date.now();
@@ -96,8 +98,35 @@ async function run() {
   baseUrl = `http://127.0.0.1:${server.address().port}`;
   const adminEmail = `admin${runId}@fitpulse.example`;
   const password = process.env.ADMIN_PASSWORD;
+  const administratorHash = await hashPassword(password);
   await query('INSERT INTO users (name, email, `password`, role, status) VALUES (?, ?, ?, ?, ?)',
-    ['Demo Admin', adminEmail, password, values.admin, values.active]);
+    ['Demo Admin', adminEmail, administratorHash, values.admin, values.active]);
+  const legacyEmail = `legacy${runId}@fitpulse.example`;
+  const legacyUser = await query('INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+    ['Legacy Client', legacyEmail, password]);
+  await call('POST', '/sessions', { email: legacyEmail, password }, null,
+    401, 'Plain-text storage cannot authenticate before migration');
+  const [beforeMigration] = await query('SELECT * FROM users WHERE idusers = ?',
+    [legacyUser.insertId]);
+  const migration = await migratePasswords();
+  verify(migration.migrated >= 1, 'Existing plain-text credentials must be migrated');
+  const [afterMigration] = await query('SELECT * FROM users WHERE idusers = ?',
+    [legacyUser.insertId]);
+  verify(isPasswordHash(afterMigration.password), 'Migration must persist an Argon2id hash');
+  verify(await verifyPassword(password, afterMigration.password),
+    'Migration must preserve the original password');
+  const { password: oldPassword, ...originalMetadata } = beforeMigration;
+  const { password: newPassword, ...migratedMetadata } = afterMigration;
+  verify(oldPassword !== newPassword, 'The database must no longer store the original password');
+  assert.deepEqual(migratedMetadata, originalMetadata);
+  assertions += 1;
+  const [unchangedAdministrator] = await query('SELECT password FROM users WHERE email = ?',
+    [adminEmail]);
+  verify(unchangedAdministrator.password === administratorHash,
+    'Migration must not hash existing Argon2id values again');
+  verify((await migratePasswords()).migrated === 0, 'Repeated migration must be idempotent');
+  await call('POST', '/sessions', { email: legacyEmail, password }, null,
+    201, 'Migrated client can log in with the original password');
   const session = await call('POST', '/sessions', { email: adminEmail, password }, null,
     201, 'Administrator session');
   const admin = session.accessToken;
@@ -106,6 +135,14 @@ async function run() {
   const client = await call('POST', '/users', {
     name: 'Demo Client', email: `client${runId}@fitpulse.example`, password
   }, null, 201, 'Registration');
+  const [storedClient] = await query('SELECT password FROM users WHERE idusers = ?', [client.id]);
+  verify(isPasswordHash(storedClient.password) && storedClient.password !== password,
+    'Registration must persist a hash instead of plain text');
+  verify(await verifyPassword(password, storedClient.password),
+    'The registration hash must verify against the complete input');
+  verify(storedClient.password.split('$')[4] !== administratorHash.split('$')[4],
+    'Accounts sharing a password must receive independent salts');
+  verify(!('password' in client), 'Registration must not return the password or its hash');
   await call('POST', '/users', { name: 'Demo', email: 'bad', password: 'short' }, null,
     400, 'Invalid registration');
   await call('POST', '/users', { name: 'x'.repeat(46),

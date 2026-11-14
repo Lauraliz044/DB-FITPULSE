@@ -13,9 +13,13 @@
     "db:setup": "node scripts/setup-database.js",
     "db:seed": "node scripts/seed-database.js",
     "test": "node tests/integration.js",
-    "db:demo": "node scripts/seed-demo.js"
+    "db:demo": "node scripts/seed-demo.js",
+    "db:migrate-passwords": "node scripts/migrate-passwords.js",
+    "test:passwords": "node --test tests/passwords.test.js",
+    "test:credential-tools": "node tests/credential-tools.js"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
