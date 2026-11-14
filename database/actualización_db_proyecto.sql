@@ -80,4 +80,4 @@ PREPARE fitpulse_stmt FROM @fitpulse_ddl;
 EXECUTE fitpulse_stmt;
 DEALLOCATE PREPARE fitpulse_stmt;
 
-SELECT 'Columnas actualizadas. Completa los cupos, horarios y descripciones pendientes.' AS resultado;
+SELECT 'Columnas actualizadas. Completa los cupos, horarios y descripciones pendientes.' AS result;

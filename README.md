@@ -2,7 +2,7 @@
 
 La base `db_proyecto` utiliza `users`, `scheduled_classes`, `packages`, `purchases` y `reviews`: cinco tablas, cuatro llaves foráneas y 25 operaciones HTTP.
 
-La API permite registro, inicio de sesión, roles, bloqueo temporal, gestión de clases y paquetes, compras, ventas y reseñas. Las reseñas vinculan al usuario con la clase; no verifican asistencia. `capacity` representa el cupo máximo de una clase.
+La API permite registro, inicio de sesión, roles, bloqueo temporal, gestión de clases y paquetes, compras, ventas y reseñas. El registro almacena hashes Argon2id con salt aleatorio y el login los verifica en el servidor. Las reseñas vinculan al usuario con la clase; no verifican asistencia. `capacity` representa el cupo máximo de una clase.
 
 Reservas, asistencia, marcas personales y progreso por asistencia quedan fuera del alcance. RF-05, RF-06, RF-08, RF-09 y RF-10 no están implementados. RF-07 no comprueba asistencia y RF-11 tiene soporte de autorización en el backend, sin un panel web implementado.
 
@@ -45,17 +45,32 @@ Después, ejecutar `npm run db:setup`. La comprobación del arranque revisa tabl
 
 La tabla de usuarios puede conservar una columna antigua adicional. Las columnas usadas para el bloqueo son `failed_login_attempts` y `locked_until`; por eso no se presenta el número de columnas de una base existente como un total fijo.
 
+### Migrar las contraseñas del corte anterior
+
+Detener la API, guardar una copia privada de la base existente e instalar las dependencias actualizadas con `npm ci`. Con las credenciales de esa base en `.env`, ejecutar:
+
+```bash
+npm run db:migrate-passwords
+npm start
+```
+
+La migración transforma los valores en texto plano de `users.password` en hashes Argon2id. Conserva los identificadores, las contraseñas originales de acceso y los demás datos de las cuentas. Una segunda ejecución omite los hashes existentes. Si falla una actualización, la transacción revierte todos sus cambios. El login actualizado rechaza las cuentas que todavía conservan texto plano: no incluye una comparación alternativa de texto.
+
+Las bases nuevas no necesitan esta migración: registro, `db:seed` y `db:demo` ya generan hashes. El procedimiento y los resultados están en [la documentación de autenticación](docs/third-cut/password-security.md).
+
 ## Pruebas y evidencias
 
 Crear una base exclusiva de pruebas cuyo nombre termine en `_test`, configurar `TEST_DB_NAME` y ejecutar:
 
 ```bash
+npm run test:passwords
 npm test
+npm run test:credential-tools
 ```
 
 Las pruebas generan datos ficticios y escriben su resultado en `evidence/test-results.json`. La colección está en `evidence/FitPulse.postman_collection.json`: completar sus variables de credenciales y ejecutar las carpetas en orden.
 
-Los JSON incluidos en `evidence/` conservan sus resultados y fechas originales de ejecuciones anteriores. Las verificaciones manuales posteriores en Swagger no actualizan automáticamente esos archivos y deben documentarse por separado.
+`evidence/test-results.json` corresponde a la última ejecución de las pruebas de integración. `evidence/credential-tools-results.json` registra las pruebas de los comandos de creación de cuentas y migración. Cada evidencia incluye su fecha; los demás resultados conservan las fechas de sus ejecuciones originales. Las verificaciones manuales en Swagger no actualizan automáticamente estos archivos.
 
 ## Carpetas
 
@@ -68,6 +83,6 @@ Los JSON incluidos en `evidence/` conservan sus resultados y fechas originales d
 | `tests/` | Pruebas de integración. |
 | `evidence/` | Colección Postman y resultados de ejecuciones. |
 
-## Pendiente
+## Alcance pendiente del tercer corte
 
-RNF-01 sigue pendiente: las contraseñas se almacenan en texto plano. El token, los roles y el bloqueo temporal no resuelven ese pendiente.
+El almacenamiento en texto plano del corte anterior fue reemplazado por Argon2id; la migración debe aplicarse también a cada instalación existente. La interfaz web integrada y las pantallas de progreso y marcas personales todavía no están implementadas en esta rama. El modelo actual de cinco tablas no almacena esos dos últimos recursos. La mejora de autenticación propuesta, aún sin implementar, es un segundo factor con WebAuthn para administradores.
