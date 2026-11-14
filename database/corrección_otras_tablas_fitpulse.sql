@@ -1,10 +1,9 @@
--- Completa la configuracion de las cuatro tablas mostradas en la captura.
 -- Ejecutar el archivo completo en una sola conexion de MySQL Workbench.
 -- Conserva los registros y sus identificadores, incluido un posible ID 0.
 USE db_proyecto;
 
-SET @fitpulse_sql_mode_anterior = @@SESSION.sql_mode;
-SET @fitpulse_fk_anterior = @@SESSION.foreign_key_checks;
+SET @fitpulse_previous_sql_mode = @@SESSION.sql_mode;
+SET @fitpulse_previous_foreign_key_checks = @@SESSION.foreign_key_checks;
 SET SESSION sql_mode = CONCAT_WS(',', NULLIF(@@SESSION.sql_mode, ''), 'NO_AUTO_VALUE_ON_ZERO');
 SET SESSION foreign_key_checks = 0;
 
@@ -18,8 +17,8 @@ ALTER TABLE purchases
 ALTER TABLE reviews
     MODIFY COLUMN idreview INT NOT NULL AUTO_INCREMENT;
 
-SET SESSION foreign_key_checks = @fitpulse_fk_anterior;
-SET SESSION sql_mode = @fitpulse_sql_mode_anterior;
+SET SESSION foreign_key_checks = @fitpulse_previous_foreign_key_checks;
+SET SESSION sql_mode = @fitpulse_previous_sql_mode;
 
 -- Cambiar los valores predeterminados sin reescribir las fechas existentes.
 ALTER TABLE purchases
@@ -41,8 +40,8 @@ PREPARE fitpulse_stmt FROM @fitpulse_ddl;
 EXECUTE fitpulse_stmt;
 DEALLOCATE PREPARE fitpulse_stmt;
 
-SELECT TABLE_NAME AS tabla, COLUMN_NAME AS campo,
-       COLUMN_DEFAULT AS valor_predeterminado, EXTRA AS extra
+SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name,
+       COLUMN_DEFAULT AS default_value, EXTRA AS extra
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
   AND TABLE_NAME IN ('scheduled_classes', 'packages', 'purchases', 'reviews')
