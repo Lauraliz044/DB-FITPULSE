@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "executedAt": "2026-11-12T18:50:33.139Z",
+  "engine": "Newman",
+  "collection": "evidence/FitPulse.postman_collection.json",
+  "requests": 55,
+  "assertions": 107,
+  "failedAssertions": 0,
+  "failures": []
+}

@@ -1,0 +1,6 @@
+{
+  "passed": true,
+  "script": "database/db_proyecto.sql",
+  "rowsUnchanged": true,
+  "executedAt": "2026-11-12T18:50:29.512Z"
+}
